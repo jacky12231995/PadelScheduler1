@@ -663,12 +663,24 @@ function resetAll(){
   document.querySelector("#tblA tbody").innerHTML = "";
   document.querySelector("#tblB tbody").innerHTML = "";
   document.getElementById("lbPanels").innerHTML = "";
+  localStorage.removeItem("padelSchedulerState");
 }
 
 /* =========================
    Wire up UI
    ========================= */
 document.getElementById("btnGenerateR1").addEventListener("click", generateR1);
+  [
+  "btnGenerateR1",
+  "btnBuildNextRound",
+  "btnSubmit",
+  "btnResubmit",
+  "btnRecalcLB"
+].forEach(id => {
+  const btn = document.getElementById(id);
+  if (btn) btn.addEventListener("click", saveState);
+});
+
 document.getElementById("btnBuildNextRound").addEventListener("click", buildNextRound);
 document.getElementById("btnSubmit").addEventListener("click", submitScores);
 document.getElementById("btnResubmit").addEventListener("click", resubmitScores);
@@ -678,9 +690,16 @@ document.getElementById("btnReset").addEventListener("click", resetAll);
 
 /* Demo seed */
 document.getElementById("playersInput").value = ["Alice","Bob","Carol","Dave","Eve","Frank","Grace"].join(", ");
+window.addEventListener("DOMContentLoaded", () => {
+  loadState();
+  renderRound();
+  renderLeaderboards();
+});
+
 </script>
 </body>
 </html>
+
 
 
 
