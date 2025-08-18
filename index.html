@@ -623,6 +623,24 @@ function resubmitScores(){
   renderLeaderboards();
   alert(`Round ${STATE.round} re-submitted.`);
 }
+/* =========================
+   保存与加载 State
+   ========================= */
+function saveState() {
+  localStorage.setItem("padelSchedulerState", JSON.stringify(STATE));
+}
+
+function loadState() {
+  const raw = localStorage.getItem("padelSchedulerState");
+  if (raw) {
+    try {
+      const parsed = JSON.parse(raw);
+      Object.assign(STATE, parsed);
+    } catch(e) {
+      console.error("Failed to load state:", e);
+    }
+  }
+}
 
 /* Reset */
 function resetAll(){
@@ -663,6 +681,7 @@ document.getElementById("playersInput").value = ["Alice","Bob","Carol","Dave","E
 </script>
 </body>
 </html>
+
 
 
 
