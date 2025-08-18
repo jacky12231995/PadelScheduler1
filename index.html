@@ -12,29 +12,36 @@
   background-size: cover;
   color: #f1f5f9; /* 保证在深色背景上文字依然清晰 */
 }
-  .card {
-  background: rgba(17, 25, 40, 0.65);  /* 深色半透明 */
-  backdrop-filter: blur(10px);         /* 磨砂玻璃效果 */
-  -webkit-backdrop-filter: blur(10px);
+ .card {
+  background: rgba(15, 23, 42, 0.7); /* 深蓝黑透明 */
+  backdrop-filter: blur(12px);       /* 磨砂玻璃 */
+  -webkit-backdrop-filter: blur(12px);
   border-radius: 1rem;
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255,255,255,0.1); /* 细微边框 */
+  box-shadow: 0 8px 20px rgba(0,0,0,0.5);  /* 阴影增加层次 */
+  color: #f1f5f9; /* 白灰字体 */
 }
-
 
 .btn {
-  background: transparent;
-  border: 1px solid rgba(255,255,255,0.4);
-  color: #fff;
-  transition: all 0.2s ease;
+  background: rgba(30, 41, 59, 0.8); 
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #e2e8f0;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  transition: all 0.2s ease-in-out;
 }
 .btn:hover {
-  background: rgba(255,255,255,0.15);
+  background: rgba(51, 65, 85, 0.9);
+  color: #fff;
+  transform: translateY(-1px);
 }
+
 .btn-primary {
-  background: linear-gradient(135deg, #4f46e5, #4338ca);
+  background: linear-gradient(135deg, #6366f1, #3b82f6);
   color: #fff;
   border: none;
 }
+
 .table {
   width: 100%;
   border-collapse: collapse;
@@ -621,6 +628,7 @@ document.getElementById("playersInput").value = ["Alice","Bob","Carol","Dave","E
 </script>
 </body>
 </html>
+
 
 
 
