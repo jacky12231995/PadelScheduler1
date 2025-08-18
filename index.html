@@ -63,33 +63,6 @@
 .table tbody tr:hover {
   background: rgba(255,255,255,0.06);
 }
-/* 输入框统一风格 */
-.input, textarea, select {
-  background: rgba(30, 41, 59, 0.85);  /* 深蓝灰底 */
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 0.4rem;
-  padding: 0.4rem 0.6rem;
-  color: #f1f5f9;                      /* 浅灰白字体 */
-  font-size: 0.9rem;
-  width: 100%;
-  outline: none;
-  transition: all 0.2s ease-in-out;
-}
-.input:focus, textarea:focus, select:focus {
-  border-color: #3b82f6;               /* 聚焦时蓝色高亮 */
-  background: rgba(51, 65, 85, 0.95);
-}
-.scoreInput {
-  width: 4rem;
-  text-align: center;
-}
-
-/* 禁用的下拉/输入框 */
-input:disabled, select:disabled, textarea:disabled {
-  background: rgba(30, 41, 59, 0.6);
-  color: #94a3b8; /* 更浅的灰字 */
-  cursor: not-allowed;
-}
 
 </style>
 </head>
@@ -663,6 +636,7 @@ document.getElementById("playersInput").value = ["Alice","Bob","Carol","Dave","E
 </script>
 </body>
 </html>
+
 
 
 
