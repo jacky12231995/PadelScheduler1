@@ -7,7 +7,12 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   :root { --card: #ffffff; --muted: #64748b; }
-  body { background: #f8fafc; color:#0f172a; }
+  body {
+  background: url("assets/padel_bg.png") no-repeat center center fixed;
+  background-size: cover;
+  color: #f1f5f9; /* 保证文字在深色背景上仍然清晰 */
+}
+
   .card { background: var(--card); border-radius: 1rem; box-shadow: 0 1px 6px rgba(2,6,23,0.06); border: 1px solid #e6edf3; }
   .btn { border-radius: .6rem; padding: .5rem .9rem; font-weight: 600; border: 1px solid #e6edf3; background: white; cursor:pointer; }
   .btn-primary { background: linear-gradient(180deg,#4f46e5,#4338ca); color:#fff; border:none; }
@@ -591,3 +596,4 @@ document.getElementById("playersInput").value = ["Alice","Bob","Carol","Dave","E
 </script>
 </body>
 </html>
+
