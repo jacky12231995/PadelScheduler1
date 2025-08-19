@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Padel Scheduler — Multi Court (≥5 players)</title>
 <script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
 <style>
   :root { --card: #ffffff; --muted: #64748b; }
   body {
@@ -45,24 +46,44 @@
 .table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;   /* ✅ 固定布局，避免列宽乱跳 */
   font-size: 0.95rem;
-  color: #f9fafb; /* 表格文字改亮色 */
+  color: #f9fafb;
 }
 .table th {
   background: linear-gradient(135deg, #1e293b, #0f172a);
   color: #f9fafb;
   font-weight: 600;
-  text-align: left;
+  text-align: center;   /* ✅ 居中更整齐 */
   padding: 0.5rem;
   border-bottom: 1px solid rgba(255,255,255,0.1);
 }
 .table td {
+  text-align: center;
   padding: 0.5rem;
   border-bottom: 1px solid rgba(255,255,255,0.05);
 }
+
+/* ✅ 固定每列宽度，让 Court A / Court B 对齐 */
+.table th:nth-child(1), .table td:nth-child(1) { width: 8%; }   /* # */
+.table th:nth-child(2), .table td:nth-child(2) { width: 25%; }  /* Team 1 */
+.table th:nth-child(3), .table td:nth-child(3) { width: 25%; }  /* Team 2 */
+.table th:nth-child(4), .table td:nth-child(4) { width: 12%; }  /* T1 Games */
+.table th:nth-child(5), .table td:nth-child(5) { width: 12%; }  /* T2 Games */
+.table th:nth-child(6), .table td:nth-child(6) { width: 18%; }  /* Winner */
+
 .table tbody tr:hover {
   background: rgba(255,255,255,0.06);
 }
+  /* 📱 Mobile 优化表格 */
+@media (max-width: 640px) {
+  .table td, .table th {
+    white-space: nowrap; /* 避免换行 */
+    padding: 0.25rem;
+    font-size: 0.75rem;
+  }
+}
+
 /* 输入框统一风格 */
 .input, textarea, select {
   background: rgba(30, 41, 59, 0.85);  /* 深蓝灰底 */
@@ -80,8 +101,10 @@
   background: rgba(51, 65, 85, 0.95);
 }
 .scoreInput {
-  width: 4rem;
+  width: 3.25rem;      /* 更适合手机宽度 */
   text-align: center;
+  font-size: 0.85rem;
+  padding: 0.25rem;
 }
 
 /* 禁用的下拉/输入框 */
@@ -90,28 +113,67 @@ input:disabled, select:disabled, textarea:disabled {
   color: #94a3b8; /* 更浅的灰字 */
   cursor: not-allowed;
 }
+/* ---- Fix: prevent header/input overlap on mobile ---- */
+.table {
+  table-layout: fixed;           /* 列宽固定，避免压扁后文字互相覆盖 */
+}
+
+/* 超过列宽时省略号，避免挤到相邻列 */
+.table th, .table td {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 指定几列的最小宽度（两张比赛表：#tblA 和 #tblB） */
+#tblA th:nth-child(1), #tblB th:nth-child(1),
+#tblA td:nth-child(1), #tblB td:nth-child(1) { width: 2.5rem; }   /* # */
+
+#tblA th:nth-child(2), #tblB th:nth-child(2),
+#tblA td:nth-child(2), #tblB td:nth-child(2),
+#tblA th:nth-child(3), #tblB th:nth-child(3),
+#tblA td:nth-child(3), #tblB td:nth-child(3) { min-width: 8.5rem; } /* Team 1 / Team 2 */
+
+#tblA th:nth-child(4), #tblB th:nth-child(4),
+#tblA td:nth-child(4), #tblB td:nth-child(4),
+#tblA th:nth-child(5), #tblB th:nth-child(5),
+#tblA td:nth-child(5), #tblB td:nth-child(5) { width: 4.2rem; }   /* T1/T2 Games */
+
+#tblA th:nth-child(6), #tblB th:nth-child(6),
+#tblA td:nth-child(6), #tblB td:nth-child(6) { width: 5.5rem; }   /* Winner */
+
+/* 📱 在手机上让表格走横向滚动，别再把列挤爆 */
+@media (max-width: 640px) {
+  .table { min-width: 720px; }   /* 强制最小宽度，容器会横向滚动 */
+}
 
 </style>
+
+<!-- ✅ 正确的 QRCode 库 -->
+<script src="https://unpkg.com/qrcodejs@1.0.0/qrcode.min.js"></script>
+
 </head>
 <body>
 <div class="max-w-6xl mx-auto p-4 space-y-6">
 
-  <header class="flex items-center justify-between">
+  <header class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
     <div>
       <h1 class="text-2xl font-bold">Padel Scheduler</h1>
       <p class="text-sm text-slate-500">Supports ≥5 players · choose 1 or 2 courts · per-round balanced doubles</p>
     </div>
-    <div class="flex gap-2">
-      <button id="btnExportCSV" class="btn">Export Overall CSV</button>
-      <button id="btnReset" class="btn">Reset</button>
-    </div>
+  <div class="flex gap-2">
+  <button id="btnExportCSV" class="btn px-4 py-2 text-sm sm:text-base">Export Overall CSV</button>
+  <button id="btnReset" class="btn px-4 py-2 text-sm sm:text-base">Reset</button>
+  <button id="btnShare" class="btn px-4 py-2 text-sm sm:text-base">Share via QR</button>
+</div>
+<div id="qrcode" class="mt-2"></div>
+
   </header>
 
   <!-- Settings -->
   <section class="card p-4">
     <div class="grid md:grid-cols-4 gap-4">
       <div class="md:col-span-2">
-        <label class="block text-sm font-medium mb-1">Players (comma-separated)</label>
+        <label class="block text-sm font-medium mb-1">Players (newline or comma-separated)</label>
         <textarea id="playersInput" rows="3" class="input" placeholder="Alice, Bob, Carol, Dave, Eve, ..."></textarea>
         <p class="text-xs text-slate-500 mt-1">Minimum 5 players. Odd counts are allowed (scheduler handles).</p>
       </div>
@@ -137,22 +199,26 @@ input:disabled, select:disabled, textarea:disabled {
         </select>
       </div>
 
-      <div class="md:col-span-4">
-        <button id="btnGenerateR1" class="btn btn-primary mt-2">Generate Round 1</button>
-      </div>
+     <div class="md:col-span-4 flex">
+  <button id="btnGenerateR1" class="btn w-full sm:w-auto btn-primary mt-2 px-4 py-2 text-sm sm:text-base">
+    Generate Round 1
+  </button>
+</div>
     </div>
   </section>
 
   <!-- Rounds -->
   <section class="grid md:grid-cols-2 gap-6">
     <div class="card p-4">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="font-semibold">Round <span id="labelRoundA">1</span> — Court A</h2>
-        <button id="btnBuildNextRound" class="btn btn-primary">Build Next Round</button>
-      </div>
+     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3">
+  <h2 class="font-semibold">Round <span id="labelRoundA">1</span> — Court A</h2>
+  <button id="btnBuildNextRound" class="btn w-full sm:w-auto btn-primary px-4 py-2 text-sm sm:text-base">
+    Build Next Round
+  </button>
+</div>
       <div class="overflow-x-auto">
         <table class="table" id="tblA">
-          <thead><tr><th>#</th><th>Team 1</th><th>Team 2</th><th>T1 Games</th><th>T2 Games</th><th>Winner</th></tr></thead>
+          <thead><tr><th>#</th><th>Team 1</th><th>Team 2</th><th>T1</th><th>T2</th><th>Winner</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
@@ -162,57 +228,20 @@ input:disabled, select:disabled, textarea:disabled {
       <h2 class="font-semibold mb-3">Round <span id="labelRoundB">1</span> — Court B</h2>
       <div class="overflow-x-auto">
         <table class="table" id="tblB">
-          <thead><tr><th>#</th><th>Team 1</th><th>Team 2</th><th>T1 Games</th><th>T2 Games</th><th>Winner</th></tr></thead>
+          <thead><tr><th>#</th><th>Team 1</th><th>Team 2</th><th>T1</th><th>T2</th><th>Winner</th></tr></thead>
           <tbody></tbody>
         </table>
       </div>
     </div>
-  </section>
-
-  <!-- Leaderboards -->
-  <section class="card p-4">
-    <div class="flex items-center justify-between mb-3">
-      <h2 class="font-semibold">Leaderboards</h2>
-      <div class="flex gap-2">
-        <button id="btnSubmit" class="btn">Submit Scores</button>
-        <button id="btnResubmit" class="btn">Resubmit</button>
-        <button id="btnRecalcLB" class="btn">Recalculate</button>
-      </div>
-    </div>
-    <div id="lbPanels" class="space-y-6"></div>
+     <!-- Leaderboards 占满两列 -->
+<div class="card p-4 md:col-span-2">
+  <div id="lbPanels"></div>
+</div>
   </section>
 
 </div>
 
 <script>
-/* ================
-   渲染某一轮赛程
-   ================ */
-function renderRound(court, round){
-  const tbl = document.getElementById(court==="A" ? "tblA" : "tblB").querySelector("tbody");
-  tbl.innerHTML = "";
-
-  (STATE.matches[round]?.[court] || []).forEach((match, idx) => {
-    const tr = document.createElement("tr");
-
-    const res = STATE.results[round]?.[court]?.[idx] || {};
-
-    tr.innerHTML = `
-      <td>${idx+1}</td>
-      <td>${match.t1 ? match.t1.join(" & ") : ""}</td>
-      <td>${match.t2 ? match.t2.join(" & ") : ""}</td>
-      <td><input type="number" min="0" class="input scoreInput" data-r="${round}" data-c="${court}" data-i="${idx}" data-side="1" value="${res.g1 ?? ""}"></td>
-      <td><input type="number" min="0" class="input scoreInput" data-r="${round}" data-c="${court}" data-i="${idx}" data-side="2" value="${res.g2 ?? ""}"></td>
-      <td>${
-        res.g1!=null && res.g2!=null
-          ? (res.g1 > res.g2 ? "T1" : "T2")
-          : `<span class="badge badge-pending">Pending</span>`
-      }</td>
-    `;
-
-    tbl.appendChild(tr);
-  });
-}
 
 /* =========================
    State
@@ -252,6 +281,25 @@ function splitCourts(players, mode){
   if (A.length < 2 && B.length >= 2) A.push(B.pop());
   if (B.length < 2 && A.length >= 2) B.push(A.pop());
   return { A, B };
+}
+
+  function uint8ToBase64(u8) {
+  let binary = "";
+  const len = u8.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(u8[i]);
+  }
+  return btoa(binary);
+}
+
+function base64ToUint8(base64) {
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
 }
 
 /* =========================
@@ -369,8 +417,8 @@ function renderCourt(court, tableId){
       <td>${idx+1}</td>
       <td>${(m.t1||[]).join(" & ")}</td>
       <td>${(m.t2||[]).join(" & ")}</td>
-      <td><input data-which="g1" data-court="${court}" data-idx="${idx}" type="number" min="0" class="input" style="width:5.5rem" value="${res.g1}"></td>
-      <td><input data-which="g2" data-court="${court}" data-idx="${idx}" type="number" min="0" class="input" style="width:5.5rem" value="${res.g2}"></td>
+      <td><input data-which="g1" data-court="${court}" data-idx="${idx}" type="number" min="0" class="input scoreInput" value="${res.g1}"></td>
+<td><input data-which="g2" data-court="${court}" data-idx="${idx}" type="number" min="0" class="input scoreInput" value="${res.g2}"></td>
       <td>${winnerBadge(res.g1, res.g2)}</td>
     `;
     tbody.appendChild(tr);
@@ -413,31 +461,107 @@ function calcRoundStats(round){
   return stats;
 }
 function renderLeaderboards(){
-  const host = document.getElementById("lbPanels"); host.innerHTML = "";
-  for (let r=1; r<=4; r++) host.appendChild(renderRoundBoard(r));
+  const host = document.getElementById("lbPanels");
+  host.innerHTML = "";
+
+  // ✅ 只渲染到当前轮次
+  for (let r = 1; r <= STATE.round; r++) {
+    host.appendChild(renderRoundBoard(r));
+  }
+
+  // ✅ 总榜永远显示
   host.appendChild(renderOverallBoard());
 }
+
 function renderRoundBoard(r){
   const wrap = document.createElement("div");
-  wrap.innerHTML = `<h3 class="font-semibold">Round ${r} Leaderboard</h3>`;
-  const table = document.createElement("table"); table.className = "table mt-2";
-  table.innerHTML = `<thead><tr><th>#</th><th>Player</th><th>Court</th><th>Pts</th><th>Apps</th></tr></thead><tbody></tbody>`;
-  wrap.appendChild(table);
+
+  // ✅ header + toggle 按钮
+  const header = document.createElement("div");
+  header.className = "flex items-center justify-between mb-1";
+  header.innerHTML = `
+  <div class="flex items-center gap-2">
+    <button class="toggle-btn text-lg" id="toggleLB${r}">🔽</button>
+    <h3 class="font-semibold">Round ${r} Leaderboard</h3>
+  </div>
+`;
+  wrap.appendChild(header);
+
+  // ✅ 内容区域（默认展开）
+  const content = document.createElement("div");
+  content.id = `lbContent${r}`;
+  wrap.appendChild(content);
+
+   // ✅ 表格（外面包一层 div，让小屏幕可横向滚动）
+  const scrollWrap = document.createElement("div");
+  scrollWrap.className = "overflow-x-auto";
+
+  const table = document.createElement("table");
+  table.className = "table mt-2";
+  table.innerHTML = `
+    <thead>
+      <tr><th>#</th><th>Player</th><th>Court</th><th>Pts</th><th>Apps</th></tr>
+    </thead>
+    <tbody></tbody>
+  `;
+
+  scrollWrap.appendChild(table);
+  content.appendChild(scrollWrap);
+
+  // ✅ 填充数据
   const tb = table.querySelector("tbody");
   const st = calcRoundStats(r);
-  const rows = Object.keys(st).map(p => ({ player: p, ...st[p] })).sort((a,b) => b.pts - a.pts || a.player.localeCompare(b.player));
+  const rows = Object.keys(st).map(p => ({ player: p, ...st[p] }))
+    .sort((a,b) => b.pts - a.pts || a.player.localeCompare(b.player));
   rows.forEach((row, i) => {
     const cup = i===0 ? "🏆 " : i===1 ? "🥈 " : i===2 ? "🥉 " : "";
     tb.innerHTML += `<tr><td>${i+1}</td><td>${cup}${row.player}</td><td>${row.court||"-"}</td><td>${row.pts}</td><td>${row.apps}</td></tr>`;
   });
+
+  // ✅ 折叠 / 展开逻辑
+  const toggleBtn = header.querySelector(`#toggleLB${r}`);
+  toggleBtn.addEventListener("click", () => {
+    const c = document.getElementById(`lbContent${r}`);
+    if (c.style.display === "none") {
+  c.style.display = "";
+  toggleBtn.textContent = "🔽";  // 展开
+} else {
+  c.style.display = "none";
+  toggleBtn.textContent = "▶";  // 收起
+}
+
+  });
+
   return wrap;
 }
 function renderOverallBoard(){
   const wrap = document.createElement("div");
   wrap.innerHTML = `<h3 class="font-semibold">Overall Leaderboard</h3>`;
-  const table = document.createElement("table"); table.className = "table mt-2";
-  table.innerHTML = `<thead><tr><th>#</th><th>Player</th><th>R1</th><th>R2</th><th>R3</th><th>R4</th><th>Total</th></tr></thead><tbody></tbody>`;
-  wrap.appendChild(table);
+    const scrollWrap = document.createElement("div");
+  scrollWrap.className = "overflow-x-auto";
+
+  const table = document.createElement("table"); 
+  table.className = "table mt-2";
+  table.innerHTML = `
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Player</th>
+      <th>R1</th>
+      <th>R2</th>
+      <th>R3</th>
+      <th>R4</th>
+      <th>Total Points</th>
+      <th>Total Apps</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+`;
+
+
+  scrollWrap.appendChild(table);
+  wrap.appendChild(scrollWrap);
+
   const tb = table.querySelector("tbody");
 
   const per = {};
@@ -454,10 +578,24 @@ function renderOverallBoard(){
     return { player: p, r1, r2, r3, r4, total };
   }).sort((a,b) => b.total - a.total || a.player.localeCompare(b.player));
 
-  rows.forEach((row, i) => {
-    const cup = i===0 ? "🏆 " : i===1 ? "🥈 " : i===2 ? "🥉 " : "";
-    tb.innerHTML += `<tr><td>${i+1}</td><td>${cup}${row.player}</td><td>${row.r1.pts}</td><td>${row.r2.pts}</td><td>${row.r3.pts}</td><td>${row.r4.pts}</td><td class="font-semibold">${row.total}</td></tr>`;
-  });
+rows.forEach((row, i) => {
+  const cup = i===0 ? "🏆 " : i===1 ? "🥈 " : i===2 ? "🥉 " : "";
+  const totalApps = row.r1.apps + row.r2.apps + row.r3.apps + row.r4.apps;
+  tb.innerHTML += `
+    <tr>
+      <td>${i+1}</td>
+      <td>${cup}${row.player}</td>
+      <td>${row.r1.pts}</td>
+      <td>${row.r2.pts}</td>
+      <td>${row.r3.pts}</td>
+      <td>${row.r4.pts}</td>
+      <td class="font-semibold">${row.total}</td>
+      <td>${totalApps}</td>
+    </tr>
+  `;
+});
+
+
   return wrap;
 }
 
@@ -506,7 +644,7 @@ function scheduleCurrent(){
 
 function generateR1(){
   try {
-    const raw = document.getElementById("playersInput").value.split(",");
+    const raw = document.getElementById("playersInput").value.split(/[\n,]+/);
     const players = ensureMinPlayers(raw);
     STATE.players = players;
     STATE.matchesPerPlayer = Math.max(1, Math.min(8, +document.getElementById("matchesPerPlayer").value || 4));
@@ -535,7 +673,8 @@ function generateR1(){
 }
 
 function buildNextRound(){
-   STATE.strategy = document.getElementById("strategy").value;
+   // 同步最新 UI 选项（关键）
+  STATE.strategy = document.getElementById("strategy").value;
   STATE.courtMode = document.getElementById("courtMode").value;
   document.getElementById("courtBCard").style.display = STATE.courtMode === "2" ? "" : "none";
   if (STATE.round >= 4) { alert("Already at round 4 (max)."); return; }
@@ -629,6 +768,7 @@ function resubmitScores(){
 /* =========================
    保存与加载 State
    ========================= */
+  
 function saveState() {
   localStorage.setItem("padelSchedulerState", JSON.stringify(STATE));
 }
@@ -639,12 +779,30 @@ function loadState() {
     try {
       const parsed = JSON.parse(raw);
       Object.assign(STATE, parsed);
+    
+     // 🔥 同步到输入框
+      if (STATE.players.length > 0) {
+        document.getElementById("playersInput").value = STATE.players.join("\n");
+      }
     } catch(e) {
       console.error("Failed to load state:", e);
     }
   }
+}/* =========================
+   分享链接 & 生成二维码
+   ========================= */
+function getShareURL() {
+  const stateStr = JSON.stringify(STATE);  
+  const compressed = pako.deflate(stateStr);
+  const encoded = uint8ToBase64(compressed);
+
+  // 🔥 关键：URL 安全
+  const safe = encodeURIComponent(encoded);
+
+  return `${window.location.origin}${window.location.pathname}?state=${safe}`;
 }
 
+  
 /* Reset */
 function resetAll(){
   if (!confirm("Reset everything?")) return;
@@ -683,7 +841,11 @@ document.getElementById("courtMode").addEventListener("change", (e) => {
   saveState();
 });
 
-document.getElementById("btnGenerateR1").addEventListener("click", generateR1);
+document.getElementById("btnGenerateR1").addEventListener("click", () => {
+  if (confirm("Are you sure you want to generate Round 1? This will overwrite any existing matches.")) {
+    generateR1();
+  }
+});
   [
   "btnGenerateR1",
   "btnBuildNextRound",
@@ -694,8 +856,64 @@ document.getElementById("btnGenerateR1").addEventListener("click", generateR1);
   const btn = document.getElementById(id);
   if (btn) btn.addEventListener("click", saveState);
 });
+document.getElementById("btnShare").addEventListener("click", () => {
+  const url = getShareURL();
 
-document.getElementById("btnBuildNextRound").addEventListener("click", buildNextRound);
+  // 创建遮罩层 + 模态框
+  const modal = document.createElement("div");
+  modal.style.position = "fixed";
+  modal.style.top = "0";
+  modal.style.left = "0";
+  modal.style.width = "100%";
+  modal.style.height = "100%";
+  modal.style.background = "rgba(0,0,0,0.6)";
+  modal.style.display = "flex";
+  modal.style.alignItems = "center";
+  modal.style.justifyContent = "center";
+  modal.style.zIndex = "9999";
+
+  const box = document.createElement("div");
+  box.style.background = "#fff";
+  box.style.padding = "20px";
+  box.style.borderRadius = "10px";
+  box.style.textAlign = "center";
+
+  const qrDiv = document.createElement("div");
+  new QRCode(qrDiv, {
+    text: url,
+    width: 300,
+    height: 300,
+    colorDark: "#000000",
+    colorLight: "#ffffff",
+    correctLevel: QRCode.CorrectLevel.H
+  });
+
+  const closeBtn = document.createElement("button");
+  closeBtn.innerText = "Close";
+  closeBtn.style.marginTop = "10px";
+  closeBtn.style.padding = "6px 12px";
+  closeBtn.style.border = "none";
+  closeBtn.style.borderRadius = "6px";
+  closeBtn.style.background = "#334155";
+  closeBtn.style.color = "#fff";
+  closeBtn.style.cursor = "pointer";
+  closeBtn.onclick = () => document.body.removeChild(modal);
+
+  box.appendChild(qrDiv);
+  box.appendChild(closeBtn);
+  modal.appendChild(box);
+  document.body.appendChild(modal);
+});
+
+
+
+
+
+document.getElementById("btnBuildNextRound").addEventListener("click", () => {
+  if (confirm("Are you sure you want to build the next round?")) {
+    buildNextRound();
+  }
+});
 document.getElementById("btnSubmit").addEventListener("click", submitScores);
 document.getElementById("btnResubmit").addEventListener("click", resubmitScores);
 document.getElementById("btnRecalcLB").addEventListener("click", renderLeaderboards);
@@ -705,14 +923,116 @@ document.getElementById("btnReset").addEventListener("click", resetAll);
 /* Demo seed */
 document.getElementById("playersInput").value = ["Alice","Bob","Carol","Dave","Eve","Frank","Grace"].join(", ");
 window.addEventListener("DOMContentLoaded", () => {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("state")) {
+    try {
+      const safe = params.get("state");
+const encoded = decodeURIComponent(safe);   // 🔥 关键
+const compressed = base64ToUint8(encoded);
+const restored = pako.inflate(compressed, { to: "string" });
+const parsed = JSON.parse(restored);
+
+      Object.assign(STATE, parsed);
+      console.log("✅ State restored from QR", STATE);
+
+      // 🔥 同步 UI 输入框
+      document.getElementById("playersInput").value = STATE.players.join(", ");
+      document.getElementById("matchesPerPlayer").value = STATE.matchesPerPlayer;
+      document.getElementById("courtMode").value = STATE.courtMode;
+      document.getElementById("strategy").value = STATE.strategy;
+      document.getElementById("courtBCard").style.display = STATE.courtMode === "2" ? "" : "none";
+
+      STATE.round = parsed.round || 1;
+
+      // 🚫 不要再调用 scheduleCurrent()
+      renderRound();
+      renderLeaderboards();
+
+      // 🔥 保存到 localStorage
+      saveState();
+
+      // 🔥 移除 URL 参数（避免刷新时回退）
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      return; // ⛔️ 避免 loadState 覆盖
+    } catch(e) {
+      console.error("❌ Failed to parse state from QR:", e);
+    }
+  }
+
+  // ✅ 如果没有二维码参数，则从 localStorage 恢复
   loadState();
   renderRound();
   renderLeaderboards();
 });
 
+
 </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
